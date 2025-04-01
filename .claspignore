@@ -1,0 +1,22 @@
+**/*.spec.ts
+**/*.test.ts
+node_modules/**
+coverage/**
+.git/**
+.github/**
+.vscode/**
+.eslintrc.js
+.eslintrc.json
+.prettierrc
+.prettierignore
+jest.config.js
+tsconfig.json
+package.json
+package-lock.json
+README.md
+*.md
+tests/**
+dist/**
+
+# プッシュするのはsrcディレクトリからビルドされたgsファイルのみにする
+!src/**/*.gs 

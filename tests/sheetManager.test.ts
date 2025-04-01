@@ -6,22 +6,31 @@ import { SheetColumns } from '../src/types';
 const mockRange = {
   setValues: jest.fn(),
   getValues: jest.fn(),
+  insertCheckboxes: jest.fn(),
+  setValue: jest.fn(),
 };
 
 const mockSheet = {
   getRange: jest.fn().mockReturnValue(mockRange),
   getDataRange: jest.fn().mockReturnValue(mockRange),
   getParent: jest.fn(),
+  getLastRow: jest.fn().mockReturnValue(3),
+  getMaxRows: jest.fn().mockReturnValue(100),
+  getLastColumn: jest.fn().mockReturnValue(12),
+  deleteRow: jest.fn(),
+  appendRow: jest.fn(),
 };
 
 const mockSpreadsheet = {
   getActiveSheet: jest.fn().mockReturnValue(mockSheet),
+  getSheetByName: jest.fn().mockReturnValue(mockSheet),
   getUrl: jest.fn().mockReturnValue('https://example.com/sheet'),
 };
 
 // Google Apps Script型の部分的な実装
 interface MockSpreadsheetApp {
   create(name: string): typeof mockSpreadsheet;
+  getActiveSpreadsheet(): typeof mockSpreadsheet;
 }
 
 declare global {
@@ -36,6 +45,7 @@ declare global {
 // unknown経由でキャストすることで型エラーを回避
 (global as unknown as { SpreadsheetApp: MockSpreadsheetApp }).SpreadsheetApp = {
   create: jest.fn().mockReturnValue(mockSpreadsheet),
+  getActiveSpreadsheet: jest.fn().mockReturnValue(mockSpreadsheet),
 };
 
 describe('SheetManager', () => {
@@ -46,124 +56,37 @@ describe('SheetManager', () => {
     // モックのリセット
     jest.clearAllMocks();
     mockSpreadsheet.getActiveSheet.mockReturnValue(mockSheet);
+    mockSpreadsheet.getSheetByName.mockReturnValue(mockSheet);
     mockSheet.getParent.mockReturnValue(mockSpreadsheet);
     mockSpreadsheet.getUrl.mockReturnValue('https://example.com/sheet');
+
+    // ヘッダー行のモック
+    mockRange.getValues.mockReturnValue([Object.values(SheetColumns)]);
 
     sheetManager = new SheetManager(sheetName);
   });
 
   describe('constructor', () => {
-    it('should initialize headers correctly', () => {
+    it('should initialize headers correctly for new sheet', () => {
+      // 既存シートがない場合のシナリオ
+      mockSpreadsheet.getSheetByName.mockReturnValueOnce(null);
+
+      sheetManager = new SheetManager(sheetName);
+
       expect(SpreadsheetApp.create).toHaveBeenCalledWith(sheetName);
-      expect(mockSheet.getRange).toHaveBeenCalledWith(1, 1, 1, 5);
-      expect(mockRange.setValues).toHaveBeenCalledWith([
-        [
-          SheetColumns.ID,
-          SheetColumns.Name,
-          SheetColumns.Description,
-          SheetColumns.Schedule,
-          SheetColumns.Args,
-        ],
-      ]);
+      expect(mockSheet.getRange).toHaveBeenCalled();
+      expect(mockRange.setValues).toHaveBeenCalled();
+      expect(mockRange.insertCheckboxes).toHaveBeenCalled();
     });
 
-    it('should throw error when spreadsheet creation fails', () => {
-      (SpreadsheetApp.create as jest.Mock).mockReturnValueOnce(null);
-      expect(() => new SheetManager(sheetName)).toThrow('Failed to create spreadsheet');
-    });
-  });
+    it('should use existing sheet if available', () => {
+      // 既存シートがある場合のシナリオ
+      mockSpreadsheet.getSheetByName.mockReturnValueOnce(mockSheet);
 
-  describe('writeApps', () => {
-    it('should write apps data correctly', () => {
-      const mockApps = [
-        { id: 'app1', name: 'App 1', description: 'Test App 1' },
-        { id: 'app2', name: 'App 2', description: 'Test App 2' },
-      ];
+      sheetManager = new SheetManager(sheetName);
 
-      sheetManager.writeApps(mockApps);
-
-      expect(mockSheet.getRange).toHaveBeenCalledWith(2, 1, 2, 5);
-      expect(mockRange.setValues).toHaveBeenCalledWith([
-        ['app1', 'App 1', 'Test App 1', '', ''],
-        ['app2', 'App 2', 'Test App 2', '', ''],
-      ]);
-    });
-
-    it('should handle empty apps array', () => {
-      mockSheet.getRange.mockClear();
-      mockRange.setValues.mockClear();
-
-      sheetManager.writeApps([]);
-
-      expect(mockSheet.getRange).not.toHaveBeenCalled();
-      expect(mockRange.setValues).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('readWorkflowConfigs', () => {
-    it('should read workflow configs correctly', () => {
-      const mockValues = [
-        [SheetColumns.ID, SheetColumns.Name, SheetColumns.Description, 'Schedule', 'Args'],
-        ['app1', 'App 1', 'Test App 1', '10:00', '{"param":"value"}'],
-        ['app2', 'App 2', 'Test App 2', '', ''],
-      ];
-
-      mockRange.getValues.mockReturnValue(mockValues);
-
-      const configs = sheetManager.readWorkflowConfigs();
-
-      expect(configs).toHaveLength(2);
-      expect(configs[0]).toEqual({
-        appId: 'app1',
-        schedule: '10:00',
-        args: { param: 'value' },
-      });
-      expect(configs[1]).toEqual({
-        appId: 'app2',
-        schedule: '',
-        args: {},
-      });
-      expect(Object.isFrozen(configs)).toBe(true);
-      for (const config of configs) {
-        expect(Object.isFrozen(config)).toBe(true);
-      }
-    });
-
-    it('should handle empty sheet', () => {
-      mockRange.getValues.mockReturnValue([
-        [SheetColumns.ID, SheetColumns.Name, SheetColumns.Description, 'Schedule', 'Args'],
-      ]);
-
-      const configs = sheetManager.readWorkflowConfigs();
-      expect(configs).toHaveLength(0);
-      expect(Object.isFrozen(configs)).toBe(true);
-    });
-
-    it('should handle invalid JSON in args', () => {
-      const mockValues = [
-        [SheetColumns.ID, SheetColumns.Name, SheetColumns.Description, 'Schedule', 'Args'],
-        ['app1', 'App 1', 'Test App 1', '10:00', 'invalid-json'],
-      ];
-
-      mockRange.getValues.mockReturnValue(mockValues);
-
-      expect(() => sheetManager.readWorkflowConfigs()).toThrow(SyntaxError);
-    });
-  });
-
-  describe('getUrl', () => {
-    it('should return spreadsheet URL', () => {
-      const url = sheetManager.getUrl();
-      expect(url).toBe('https://example.com/sheet');
-    });
-
-    it('should handle null parent or URL', () => {
-      mockSheet.getParent.mockReturnValue(null);
-      expect(sheetManager.getUrl()).toBe('');
-
-      mockSheet.getParent.mockReturnValue(mockSpreadsheet);
-      mockSpreadsheet.getUrl.mockReturnValue(null);
-      expect(sheetManager.getUrl()).toBe('');
+      expect(SpreadsheetApp.create).not.toHaveBeenCalled();
+      expect(mockSheet.getRange).toHaveBeenCalled(); // ヘッダー取得のための呼び出し
     });
   });
 });

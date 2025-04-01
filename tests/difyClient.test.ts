@@ -1,5 +1,5 @@
 import type { DifyConfig } from '../src/types';
-import { DifyClient } from '../src/difyClient';
+import { DifyClient, DifyAPIError } from '../src/difyClient';
 
 // モックの設定
 const mockFetch = jest.fn();
@@ -71,7 +71,7 @@ describe('DifyClient', () => {
       expect(token).toBe(mockToken);
     });
 
-    it('should throw APIError when login fails', async () => {
+    it('should throw DifyAPIError when login fails', async () => {
       mockFetch.mockReturnValueOnce({
         getResponseCode: () => 401,
         getContentText: () => 'Unauthorized',
@@ -129,7 +129,7 @@ describe('DifyClient', () => {
       expect(result).toEqual({ data: mockApps });
     });
 
-    it('should throw APIError when fetching apps fails', async () => {
+    it('should throw DifyAPIError when fetching apps fails', async () => {
       mockFetch
         .mockReturnValueOnce({
           getResponseCode: () => 200,
@@ -165,7 +165,7 @@ describe('DifyClient', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it('should throw APIError when workflow execution fails', async () => {
+    it('should throw DifyAPIError when workflow execution fails', async () => {
       mockFetch.mockReturnValueOnce({
         getResponseCode: () => 500,
         getContentText: () => 'Internal Server Error',

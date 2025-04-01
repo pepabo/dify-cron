@@ -9,12 +9,12 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "push": "clasp push",
-    "deploy": "npm run build && npm run push",
+    "deploy": "npm run build && npm run clasp:push",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
     "clasp:login": "clasp login",
     "clasp:create": "clasp create --title \"Dify Apps Sheet\" --type standalone",
-    "clasp:push": "clasp push",
+    "clasp:push": "npm run build && clasp push",
     "clasp:deploy": "clasp deploy"
   },
   "keywords": [
