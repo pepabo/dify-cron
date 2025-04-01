@@ -3,6 +3,7 @@ import { DifyClient, DifyAPIError } from '../src/difyClient';
 
 // モックの設定
 const mockFetch = jest.fn();
+const mockLog = jest.fn();
 
 // Google Apps Script型の部分的な実装
 interface MockHTTPResponse {
@@ -19,6 +20,9 @@ declare global {
   namespace NodeJS {
     interface Global {
       UrlFetchApp: MockUrlFetchApp;
+      Logger: {
+        log: jest.Mock;
+      };
     }
   }
 }
@@ -26,6 +30,10 @@ declare global {
 // unknown経由でキャストすることで型エラーを回避
 (global as unknown as { UrlFetchApp: MockUrlFetchApp }).UrlFetchApp = {
   fetch: mockFetch,
+};
+
+(global as unknown as { Logger: { log: jest.Mock } }).Logger = {
+  log: mockLog,
 };
 
 describe('DifyClient', () => {
@@ -39,6 +47,7 @@ describe('DifyClient', () => {
   beforeEach(() => {
     client = new DifyClient(mockConfig);
     mockFetch.mockClear();
+    mockLog.mockClear();
   });
 
   describe('constructor', () => {
@@ -79,6 +88,40 @@ describe('DifyClient', () => {
 
       const { login } = client.getTestMethods();
       await expect(login()).rejects.toThrow('API request failed');
+    });
+
+    it('should handle different token response formats', async () => {
+      // ケース1: Tokenが直接返される場合
+      mockFetch.mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ token: 'direct-token' }),
+      });
+
+      let { login } = client.getTestMethods();
+      let token = await login();
+      expect(token).toBe('direct-token');
+
+      // ケース2: access_tokenが直接返される場合
+      client = new DifyClient(mockConfig);
+      mockFetch.mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ access_token: 'access-token' }),
+      });
+
+      login = client.getTestMethods().login;
+      token = await login();
+      expect(token).toBe('access-token');
+
+      // ケース3: data.access_tokenが返される場合
+      client = new DifyClient(mockConfig);
+      mockFetch.mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ data: { access_token: 'nested-token' } }),
+      });
+
+      login = client.getTestMethods().login;
+      token = await login();
+      expect(token).toBe('nested-token');
     });
   });
 
@@ -142,6 +185,20 @@ describe('DifyClient', () => {
 
       await expect(client.getApps()).rejects.toThrow('API request failed');
     });
+
+    it('should throw DifyAPIError when apps data is invalid', async () => {
+      mockFetch
+        .mockReturnValueOnce({
+          getResponseCode: () => 200,
+          getContentText: () => JSON.stringify({ token: 'test-token' }),
+        })
+        .mockReturnValueOnce({
+          getResponseCode: () => 200,
+          getContentText: () => JSON.stringify({ data: 'not-an-array' }),
+        });
+
+      await expect(client.getApps()).rejects.toThrow('Invalid apps data in response');
+    });
   });
 
   describe('executeWorkflow', () => {
@@ -185,6 +242,98 @@ describe('DifyClient', () => {
       const originalArgs = { test: true };
       await client.executeWorkflow(mockAppId, originalArgs);
       expect(originalArgs).toEqual({ test: true });
+    });
+  });
+
+  describe('executeWorkflowWithApiKey', () => {
+    const mockAppId = 'test-app';
+    const mockApiKey = 'test-api-key';
+    const mockInputs = { query: 'test query' };
+
+    it('should execute workflow with API key using the first endpoint', async () => {
+      mockFetch.mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ success: true, results: 'test result' }),
+      });
+
+      const result = await client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs);
+      expect(result).toEqual({ success: true, results: 'test result' });
+
+      // 正しいエンドポイントが呼ばれたことを検証
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dify.test/v1/workflows/run',
+        expect.objectContaining({
+          method: 'post',
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockApiKey}`,
+          }),
+        }),
+      );
+
+      // ペイロードが正しく構成されていることを検証
+      const lastCall = mockFetch.mock.calls[0][1];
+      const payload = JSON.parse(lastCall.payload);
+      expect(payload).toEqual({
+        inputs: mockInputs,
+        response_mode: 'blocking',
+        user: 'system-cron',
+      });
+    });
+
+    it('should try fallback endpoints when the first one fails', async () => {
+      // 最初のエンドポイントはエラーを返す
+      mockFetch.mockImplementationOnce(() => {
+        throw new Error('Network error');
+      });
+
+      // 2番目のエンドポイントは成功する
+      mockFetch.mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ success: true }),
+      });
+
+      const result = await client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs);
+      expect(result).toEqual({ success: true });
+
+      // 2番目のエンドポイントが正しく呼ばれたことを検証
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.dify.test/api/workflow-run',
+        expect.anything(),
+      );
+    });
+
+    it('should handle custom response_mode and user identifier', async () => {
+      mockFetch.mockReturnValueOnce({
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({ success: true }),
+      });
+
+      await client.executeWorkflowWithApiKey(
+        mockAppId,
+        mockApiKey,
+        mockInputs,
+        'streaming',
+        'custom-user',
+      );
+
+      // カスタムパラメータが正しく設定されていることを検証
+      const lastCall = mockFetch.mock.calls[0][1];
+      const payload = JSON.parse(lastCall.payload);
+      expect(payload).toEqual({
+        inputs: mockInputs,
+        response_mode: 'streaming',
+        user: 'custom-user',
+      });
+    });
+
+    it('should handle errors and wrap them in DifyAPIError', async () => {
+      mockFetch.mockImplementation(() => {
+        throw new Error('Network error');
+      });
+
+      await expect(
+        client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs),
+      ).rejects.toThrow(DifyAPIError);
     });
   });
 });

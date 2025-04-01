@@ -111,17 +111,3 @@ export interface HTTPResponse {
   readonly getResponseCode: () => number;
   readonly getContentText: () => string;
 }
-
-/**
- * APIエラーの型定義
- */
-export class APIError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode: number,
-    public readonly response: string,
-  ) {
-    super(message);
-    this.name = 'APIError';
-  }
-}

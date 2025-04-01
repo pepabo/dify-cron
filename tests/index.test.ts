@@ -7,6 +7,7 @@ import {
 } from '../src';
 import { DifyClient } from '../src/difyClient';
 import { SheetManager } from '../src/sheetManager';
+import type { AppRow } from '../src/types';
 
 // モックの設定
 const mockGetProperty = jest.fn();
@@ -89,17 +90,8 @@ declare global {
 jest.mock('../src/difyClient');
 jest.mock('../src/sheetManager');
 
-// isCronMatchをモック化
-jest.mock('../src', () => {
-  const originalModule = jest.requireActual('../src');
-  return {
-    ...originalModule,
-    isCronMatch: jest.fn().mockImplementation((date, row) => {
-      // このデフォルト実装は後でテスト内で上書きされます
-      return false;
-    }),
-  };
-});
+// isCronMatchの元の実装を使用するように戻す
+jest.unmock('../src');
 
 describe('Main Application', () => {
   beforeEach(() => {
@@ -159,6 +151,116 @@ describe('Main Application', () => {
       await expect(syncDifyApps()).rejects.toThrow('API Error');
       expect(mockLog).toHaveBeenCalledWith(expect.stringContaining('Failed to sync Dify apps'));
     });
+  });
+
+  describe('isCronMatch', () => {
+    let testDate: Date;
+    let cronConfig: AppRow;
+
+    beforeEach(() => {
+      // 2023年1月23日 (月) 14:35:00
+      testDate = new Date(2023, 0, 23, 14, 35, 0);
+
+      // デフォルトのcron設定
+      cronConfig = {
+        enabled: true,
+        id: 'test-id',
+        name: 'Test App',
+        description: 'Test Description',
+        apiSecret: '',
+        cronMinutes: '*',
+        cronHours: '*',
+        cronDayOfMonth: '*',
+        cronMonth: '*',
+        cronDayOfWeek: '*',
+        args: '',
+        lastSync: '',
+        lastRun: '',
+      };
+    });
+
+    it('should match when all fields are wildcard (*)', () => {
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+    });
+
+    it('should match when minute matches exactly', () => {
+      cronConfig.cronMinutes = '35';
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronMinutes = '36';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when hour matches exactly', () => {
+      cronConfig.cronHours = '14';
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronHours = '15';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when day of month matches exactly', () => {
+      cronConfig.cronDayOfMonth = '23';
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronDayOfMonth = '24';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when month matches exactly', () => {
+      cronConfig.cronMonth = '1'; // 1月
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronMonth = '2';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when day of week matches exactly', () => {
+      cronConfig.cronDayOfWeek = '1'; // 月曜日
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronDayOfWeek = '2';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when using range expressions', () => {
+      cronConfig.cronMinutes = '30-40';
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronMinutes = '10-30';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when using list expressions', () => {
+      cronConfig.cronMinutes = '10,35,55';
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronMinutes = '10,20,30';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when using step expressions', () => {
+      cronConfig.cronMinutes = '*/5'; // 5分ごと（0, 5, 10, 15, ..., 55）
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+
+      cronConfig.cronMinutes = '*/10'; // 10分ごと（0, 10, 20, 30, 40, 50）
+      expect(isCronMatch(testDate, cronConfig)).toBe(false);
+    });
+
+    it('should match when using complex expressions', () => {
+      // 月〜金曜日の9-17時の毎時15分と45分
+      cronConfig.cronMinutes = '15,45';
+      cronConfig.cronHours = '9-17';
+      cronConfig.cronDayOfWeek = '1-5';
+      expect(isCronMatch(testDate, cronConfig)).toBe(false); // 35分なのでfalse
+
+      cronConfig.cronMinutes = '35';
+      expect(isCronMatch(testDate, cronConfig)).toBe(true);
+    });
+  });
+
+  describe('checkAndRunCronJobs', () => {
+    // 既存のテストケースをここに追加する場合は実装する
   });
 
   describe('Trigger Creation', () => {

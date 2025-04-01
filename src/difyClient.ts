@@ -7,6 +7,7 @@ import type {
 } from './types';
 
 declare const UrlFetchApp: GoogleAppsScript.URL_Fetch.UrlFetchApp;
+declare const Logger: GoogleAppsScript.Base.Logger;
 
 interface DifyResponse {
   token?: string;
@@ -189,22 +190,6 @@ export class DifyClient {
   }
 
   /**
-   * アプリのDSLファイルをエクスポートする
-   * @param {string} appId アプリケーションID
-   * @param {boolean} includeSecret シークレット変数を含めるかどうか
-   * @returns {Promise<DifyResponse>} DSLデータ
-   * @throws {DifyAPIError} APIエラー
-   */
-  async exportAppDSL(appId: string, includeSecret = true): Promise<DifyResponse> {
-    const token = await this.#getToken();
-    return this.#fetch(`/console/api/apps/${appId}/export?include_secret=${includeSecret}`, {
-      method: 'get',
-      headers: { Authorization: `Bearer ${token}` },
-      muteHttpExceptions: true,
-    });
-  }
-
-  /**
    * APIキーを使ってワークフローを実行する
    * @param {string} appId アプリケーションID
    * @param {string} apiKey アプリケーションAPIキー
@@ -293,31 +278,6 @@ export class DifyClient {
         String(error),
       );
     }
-  }
-
-  /**
-   * ファイル変数をアップロードしてワークフローに送信するための準備を行う
-   * @param {string} variableName 変数名
-   * @param {string} uploadFileId アップロードされたファイルID
-   * @param {string} [documentType="text"] ドキュメントタイプ
-   * @param {string} [transferMethod="local_file"] 転送方式
-   * @returns {Object} ファイル変数オブジェクト
-   */
-  createFileVariable(
-    variableName: string,
-    uploadFileId: string,
-    documentType = 'text',
-    transferMethod = 'local_file',
-  ): Record<string, unknown[]> {
-    return {
-      [variableName]: [
-        {
-          transfer_method: transferMethod,
-          upload_file_id: uploadFileId,
-          type: documentType,
-        },
-      ],
-    };
   }
 
   /**
