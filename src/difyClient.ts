@@ -1,10 +1,4 @@
-import type {
-  DifyAuthResponse,
-  DifyAppsResponse,
-  DifyConfig,
-  HTTPResponse,
-  DifyApp,
-} from './types';
+import type { DifyConfig, DifyApp } from './types';
 
 declare const UrlFetchApp: GoogleAppsScript.URL_Fetch.UrlFetchApp;
 declare const Logger: GoogleAppsScript.Base.Logger;
@@ -278,16 +272,5 @@ export class DifyClient {
         String(error),
       );
     }
-  }
-
-  /**
-   * テスト用のメソッドを取得する
-   * @returns {Object} テスト用のメソッド
-   */
-  getTestMethods() {
-    return {
-      login: async (): Promise<string> => this.#login(),
-      getToken: async (): Promise<string> => this.#getToken(),
-    };
   }
 }

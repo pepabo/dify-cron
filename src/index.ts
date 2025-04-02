@@ -1,4 +1,4 @@
-import type { DifyConfig, AppRow } from './types';
+import type { AppRow } from './types';
 import { DifyClient } from './difyClient';
 import { SheetManager } from './sheetManager';
 

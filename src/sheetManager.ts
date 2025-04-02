@@ -1,4 +1,4 @@
-import type { DifyApp, AppRow } from './types';
+import type { DifyApp, AppRow, SheetColumnValue } from './types';
 
 declare const SpreadsheetApp: GoogleAppsScript.Spreadsheet.SpreadsheetApp;
 declare const PropertiesService: GoogleAppsScript.Properties.PropertiesService;
@@ -154,49 +154,63 @@ export class SheetManager {
         }
       }
 
-      // カラムの幅を自動調整
-      sheet.autoResizeColumns(1, this.#headers.length);
+      // カラムの書式設定を一括で行う
+      const columnFormatters = [
+        {
+          name: SHEET_COLUMNS.Description,
+          format: (index: number) => {
+            const column = sheet.getRange(1, index + 1, sheet.getMaxRows(), 1);
+            column.setWrap(true);
+            sheet.setColumnWidth(index + 1, 300);
+          },
+        },
+        {
+          name: SHEET_COLUMNS.Args,
+          format: (index: number) => {
+            const column = sheet.getRange(1, index + 1, sheet.getMaxRows(), 1);
+            column.setWrap(true);
+            sheet.setColumnWidth(index + 1, 250);
+          },
+        },
+      ];
 
-      // Descriptionカラムの折り返し設定
-      const descriptionColIndex = this.#getColumnIndex(SHEET_COLUMNS.Description);
-      if (descriptionColIndex !== -1) {
-        const column = sheet.getRange(1, descriptionColIndex + 1, sheet.getMaxRows(), 1);
-        column.setWrap(true);
-        // Descriptionカラムの幅を広めに設定（ピクセル単位）
-        sheet.setColumnWidth(descriptionColIndex + 1, 300);
-      }
-
-      // Argsカラムの折り返し設定と幅の調整
-      const argsColIndex = this.#getColumnIndex(SHEET_COLUMNS.Args);
-      if (argsColIndex !== -1) {
-        const column = sheet.getRange(1, argsColIndex + 1, sheet.getMaxRows(), 1);
-        column.setWrap(true);
-        // Argsカラムの幅を広めに設定
-        sheet.setColumnWidth(argsColIndex + 1, 250);
-      }
-
-      // その他のカラムは切り詰める設定に
-      for (let i = 0; i < this.#headers.length; i++) {
-        // DescriptionとArgs以外のカラムに対して適用
-        if (i !== descriptionColIndex && i !== argsColIndex) {
-          const column = sheet.getRange(1, i + 1, sheet.getMaxRows(), 1);
-          column.setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+      // 特殊フォーマットを適用
+      for (const formatter of columnFormatters) {
+        const colIndex = this.#getColumnIndex(formatter.name);
+        if (colIndex !== -1) {
+          formatter.format(colIndex);
         }
       }
 
-      // cron形式の列を中央揃えに設定
+      // Cron関連カラムを中央揃えに設定
       const cronColumns = [
-        this.#getColumnIndex(SHEET_COLUMNS.CronMinutes),
-        this.#getColumnIndex(SHEET_COLUMNS.CronHours),
-        this.#getColumnIndex(SHEET_COLUMNS.CronDayOfMonth),
-        this.#getColumnIndex(SHEET_COLUMNS.CronMonth),
-        this.#getColumnIndex(SHEET_COLUMNS.CronDayOfWeek),
+        SHEET_COLUMNS.CronMinutes,
+        SHEET_COLUMNS.CronHours,
+        SHEET_COLUMNS.CronDayOfMonth,
+        SHEET_COLUMNS.CronMonth,
+        SHEET_COLUMNS.CronDayOfWeek,
       ];
 
-      for (const index of cronColumns) {
+      for (const columnName of cronColumns) {
+        const index = this.#getColumnIndex(columnName);
         if (index !== -1) {
           const column = sheet.getRange(1, index + 1, sheet.getMaxRows(), 1);
           column.setHorizontalAlignment('center');
+        }
+      }
+
+      // 特殊フォーマットを適用していないカラムは切り詰め表示に設定
+      for (let i = 0; i < this.#headers.length; i++) {
+        const columnName = this.#headers[i];
+        const isSpecialFormat = [
+          ...cronColumns,
+          SHEET_COLUMNS.Description,
+          SHEET_COLUMNS.Args,
+        ].includes(columnName as SheetColumnValue);
+
+        if (!isSpecialFormat) {
+          const column = sheet.getRange(1, i + 1, sheet.getMaxRows(), 1);
+          column.setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
         }
       }
 

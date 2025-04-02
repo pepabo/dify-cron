@@ -398,4 +398,98 @@ describe('SheetManager', () => {
       expect(url).toBe('https://example.com/sheet');
     });
   });
+
+  describe('updateLastRun', () => {
+    beforeEach(() => {
+      // モックのリセット
+      jest.clearAllMocks();
+
+      // ヘッダー行と2つのアプリ行を持つテストデータを作成
+      const headerRow = Object.values(SheetColumns);
+      const dataRows = [
+        headerRow,
+        [
+          true,
+          'app1',
+          'App 1',
+          'Test App 1',
+          'api-key-1',
+          '*/5',
+          '*',
+          '*',
+          '*',
+          '*',
+          '{}',
+          '2023-01-01',
+          '',
+        ],
+        [
+          false,
+          'app2',
+          'App 2',
+          'Test App 2',
+          'api-key-2',
+          '0',
+          '12',
+          '1',
+          '*',
+          '1-5',
+          '{"test":true}',
+          '',
+          '',
+        ],
+      ];
+      mockRange.getValues.mockReturnValue(dataRows);
+    });
+
+    it('should update the LastRun column for the specified app', () => {
+      const appId = 'app1';
+      const runTime = '2023-01-02T12:34:56Z';
+
+      // LastRun列のインデックスを計算（0ベース）
+      const lastRunColumnIndex = Object.values(SheetColumns).indexOf(SheetColumns.LastRun);
+
+      // テスト実行
+      sheetManager.updateLastRun(appId, runTime);
+
+      // 検証：app1の行（2行目 = インデックス1 + ヘッダー行）のLastRun列を更新するためにgetRangeが呼ばれたか
+      expect(mockSheet.getRange).toHaveBeenCalledWith(2, lastRunColumnIndex + 1);
+      expect(mockRange.setValue).toHaveBeenCalledWith(runTime);
+    });
+
+    it('should not update anything if app ID does not exist', () => {
+      const appId = 'non-existent-app';
+      const runTime = '2023-01-02T12:34:56Z';
+
+      // モックをクリア
+      mockSheet.getRange.mockClear();
+      mockRange.setValue.mockClear();
+
+      // テスト実行
+      sheetManager.updateLastRun(appId, runTime);
+
+      // 検証：存在しないアプリIDなので更新は行われないはず
+      expect(mockSheet.getRange).not.toHaveBeenCalled();
+      expect(mockRange.setValue).not.toHaveBeenCalled();
+    });
+
+    it('should handle empty sheet gracefully', () => {
+      // 空のシートをシミュレート
+      mockSheet.getLastRow.mockReturnValueOnce(0);
+
+      const appId = 'app1';
+      const runTime = '2023-01-02T12:34:56Z';
+
+      // モックをクリア
+      mockSheet.getRange.mockClear();
+      mockRange.setValue.mockClear();
+
+      // テスト実行
+      sheetManager.updateLastRun(appId, runTime);
+
+      // 検証：シートが空なので更新は行われないはず
+      expect(mockSheet.getRange).not.toHaveBeenCalled();
+      expect(mockRange.setValue).not.toHaveBeenCalled();
+    });
+  });
 });
