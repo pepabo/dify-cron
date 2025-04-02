@@ -3,7 +3,6 @@ import type { DifyApp, AppRow } from './types';
 declare const SpreadsheetApp: GoogleAppsScript.Spreadsheet.SpreadsheetApp;
 declare const PropertiesService: GoogleAppsScript.Properties.PropertiesService;
 declare const Logger: GoogleAppsScript.Base.Logger;
-declare const Utilities: GoogleAppsScript.Utilities.Utilities;
 declare const SHEET_COLUMNS: {
   readonly Enabled: string;
   readonly ID: string;
@@ -152,6 +151,32 @@ export class SheetManager {
         const maxRows = Math.max(1, sheet.getMaxRows() - 1);
         if (maxRows > 0) {
           sheet.getRange(2, enabledColIndex + 1, maxRows, 1).insertCheckboxes();
+        }
+      }
+
+      // カラムの幅を自動調整
+      sheet.autoResizeColumns(1, this.#headers.length);
+
+      // Descriptionカラムの折り返し設定
+      const descriptionColIndex = this.#getColumnIndex(SHEET_COLUMNS.Description);
+      if (descriptionColIndex !== -1) {
+        const column = sheet.getRange(1, descriptionColIndex + 1, sheet.getMaxRows(), 1);
+        column.setWrap(true);
+      }
+
+      // cron形式の列を中央揃えに設定
+      const cronColumns = [
+        this.#getColumnIndex(SHEET_COLUMNS.CronMinutes),
+        this.#getColumnIndex(SHEET_COLUMNS.CronHours),
+        this.#getColumnIndex(SHEET_COLUMNS.CronDayOfMonth),
+        this.#getColumnIndex(SHEET_COLUMNS.CronMonth),
+        this.#getColumnIndex(SHEET_COLUMNS.CronDayOfWeek),
+      ];
+
+      for (const index of cronColumns) {
+        if (index !== -1) {
+          const column = sheet.getRange(1, index + 1, sheet.getMaxRows(), 1);
+          column.setHorizontalAlignment('center');
         }
       }
 
