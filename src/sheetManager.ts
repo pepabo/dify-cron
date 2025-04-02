@@ -162,6 +162,26 @@ export class SheetManager {
       if (descriptionColIndex !== -1) {
         const column = sheet.getRange(1, descriptionColIndex + 1, sheet.getMaxRows(), 1);
         column.setWrap(true);
+        // Descriptionカラムの幅を広めに設定（ピクセル単位）
+        sheet.setColumnWidth(descriptionColIndex + 1, 300);
+      }
+
+      // Argsカラムの折り返し設定と幅の調整
+      const argsColIndex = this.#getColumnIndex(SHEET_COLUMNS.Args);
+      if (argsColIndex !== -1) {
+        const column = sheet.getRange(1, argsColIndex + 1, sheet.getMaxRows(), 1);
+        column.setWrap(true);
+        // Argsカラムの幅を広めに設定
+        sheet.setColumnWidth(argsColIndex + 1, 250);
+      }
+
+      // その他のカラムは切り詰める設定に
+      for (let i = 0; i < this.#headers.length; i++) {
+        // DescriptionとArgs以外のカラムに対して適用
+        if (i !== descriptionColIndex && i !== argsColIndex) {
+          const column = sheet.getRange(1, i + 1, sheet.getMaxRows(), 1);
+          column.setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+        }
       }
 
       // cron形式の列を中央揃えに設定
