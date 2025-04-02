@@ -273,7 +273,7 @@ describe('Main Application', () => {
           id: 'app1',
           name: 'App 1',
           description: 'App 1 Description',
-          apiSecret: '',
+          apiSecret: 'api-key-1',
           cronMinutes: '*',
           cronHours: '*',
           cronDayOfMonth: '*',
@@ -288,7 +288,7 @@ describe('Main Application', () => {
           id: 'app2',
           name: 'App 2',
           description: 'App 2 Description',
-          apiSecret: 'api-secret-2',
+          apiSecret: 'api-key-2',
           cronMinutes: '0', // 実行しないはず（cron不一致）
           cronHours: '*',
           cronDayOfMonth: '*',
@@ -303,7 +303,7 @@ describe('Main Application', () => {
           id: 'app3',
           name: 'App 3',
           description: 'App 3 Description',
-          apiSecret: '',
+          apiSecret: 'api-key-3',
           cronMinutes: '*',
           cronHours: '*',
           cronDayOfMonth: '*',
@@ -313,96 +313,12 @@ describe('Main Application', () => {
           lastSync: '',
           lastRun: '',
         },
-      ];
-
-      // モックの設定
-      const mockGetAllRows = jest.fn().mockReturnValue(mockRows);
-      const mockUpdateLastRun = jest.fn();
-      const mockExecuteWorkflow = jest.fn().mockResolvedValue({ success: true });
-      const mockExecuteWorkflowWithApiKey = jest.fn().mockResolvedValue({ success: true });
-
-      (SheetManager as jest.Mock).mockImplementation(() => ({
-        getAllRows: mockGetAllRows,
-        updateLastRun: mockUpdateLastRun,
-      }));
-
-      (DifyClient as jest.Mock).mockImplementation(() => ({
-        executeWorkflow: mockExecuteWorkflow,
-        executeWorkflowWithApiKey: mockExecuteWorkflowWithApiKey,
-      }));
-
-      // テスト実行
-      await checkAndRunCronJobs();
-
-      // 検証
-      expect(mockGetAllRows).toHaveBeenCalled();
-      expect(mockExecuteWorkflow).toHaveBeenCalledWith('app1', { param: 'value' });
-      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalled(); // app2はcron不一致なので実行されない
-      expect(mockUpdateLastRun).toHaveBeenCalledWith('app1', expect.any(String));
-      expect(mockUpdateLastRun).not.toHaveBeenCalledWith('app2', expect.any(String));
-      expect(mockUpdateLastRun).not.toHaveBeenCalledWith('app3', expect.any(String));
-    });
-
-    it('should use API key when available', async () => {
-      // API Keyを持つアプリのモックデータ
-      const mockRows = [
         {
           enabled: true,
-          id: 'app-with-key',
-          name: 'App With Key',
-          description: 'App with API Key',
-          apiSecret: 'test-api-key',
-          cronMinutes: '*',
-          cronHours: '*',
-          cronDayOfMonth: '*',
-          cronMonth: '*',
-          cronDayOfWeek: '*',
-          args: '{"test":true}',
-          lastSync: '',
-          lastRun: '',
-        },
-      ];
-
-      // モックの設定
-      const mockGetAllRows = jest.fn().mockReturnValue(mockRows);
-      const mockUpdateLastRun = jest.fn();
-      const mockExecuteWorkflow = jest.fn();
-      const mockExecuteWorkflowWithApiKey = jest.fn().mockResolvedValue({ success: true });
-
-      (SheetManager as jest.Mock).mockImplementation(() => ({
-        getAllRows: mockGetAllRows,
-        updateLastRun: mockUpdateLastRun,
-      }));
-
-      (DifyClient as jest.Mock).mockImplementation(() => ({
-        executeWorkflow: mockExecuteWorkflow,
-        executeWorkflowWithApiKey: mockExecuteWorkflowWithApiKey,
-      }));
-
-      // テスト実行
-      await checkAndRunCronJobs();
-
-      // 検証
-      expect(mockExecuteWorkflowWithApiKey).toHaveBeenCalledWith(
-        'app-with-key',
-        'test-api-key',
-        { test: true },
-        'blocking',
-        'cron-job-app-with-key',
-      );
-      expect(mockExecuteWorkflow).not.toHaveBeenCalled();
-      expect(mockUpdateLastRun).toHaveBeenCalledWith('app-with-key', expect.any(String));
-    });
-
-    it('should handle errors during execution', async () => {
-      // エラーが発生するアプリのモックデータ
-      const mockRows = [
-        {
-          enabled: true,
-          id: 'app-with-error',
-          name: 'Error App',
-          description: 'This app will throw an error',
-          apiSecret: '',
+          id: 'app4',
+          name: 'App 4',
+          description: 'App 4 Description',
+          apiSecret: '', // APIキーがないのでスキップされるはず
           cronMinutes: '*',
           cronHours: '*',
           cronDayOfMonth: '*',
@@ -417,7 +333,7 @@ describe('Main Application', () => {
       // モックの設定
       const mockGetAllRows = jest.fn().mockReturnValue(mockRows);
       const mockUpdateLastRun = jest.fn();
-      const mockExecuteWorkflow = jest.fn().mockRejectedValue(new Error('Test error'));
+      const mockExecuteWorkflowWithApiKey = jest.fn().mockResolvedValue({ success: true });
 
       (SheetManager as jest.Mock).mockImplementation(() => ({
         getAllRows: mockGetAllRows,
@@ -425,7 +341,81 @@ describe('Main Application', () => {
       }));
 
       (DifyClient as jest.Mock).mockImplementation(() => ({
-        executeWorkflow: mockExecuteWorkflow,
+        executeWorkflowWithApiKey: mockExecuteWorkflowWithApiKey,
+      }));
+
+      // テスト実行
+      await checkAndRunCronJobs();
+
+      // 検証
+      expect(mockGetAllRows).toHaveBeenCalled();
+      expect(mockExecuteWorkflowWithApiKey).toHaveBeenCalledWith(
+        'app1',
+        'api-key-1',
+        { param: 'value' },
+        'blocking',
+        'cron-job-app1',
+      );
+      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalledWith(
+        'app2',
+        expect.any(String),
+        expect.any(Object),
+        expect.any(String),
+        expect.any(String),
+      ); // app2はcron不一致なので実行されない
+      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalledWith(
+        'app3',
+        expect.any(String),
+        expect.any(Object),
+        expect.any(String),
+        expect.any(String),
+      ); // app3は無効化されているので実行されない
+      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalledWith(
+        'app4',
+        expect.any(String),
+        expect.any(Object),
+        expect.any(String),
+        expect.any(String),
+      ); // app4はAPIキーがないので実行されない
+      expect(mockUpdateLastRun).toHaveBeenCalledWith('app1', expect.any(String));
+      expect(mockUpdateLastRun).not.toHaveBeenCalledWith('app2', expect.any(String));
+      expect(mockUpdateLastRun).not.toHaveBeenCalledWith('app3', expect.any(String));
+      expect(mockUpdateLastRun).not.toHaveBeenCalledWith('app4', expect.any(String));
+      expect(mockLog).toHaveBeenCalledWith(expect.stringContaining('Skipping workflow for app4'));
+    });
+
+    it('should handle errors during execution', async () => {
+      // エラーが発生するアプリのモックデータ
+      const mockRows = [
+        {
+          enabled: true,
+          id: 'app-with-error',
+          name: 'Error App',
+          description: 'This app will throw an error',
+          apiSecret: 'api-key-error',
+          cronMinutes: '*',
+          cronHours: '*',
+          cronDayOfMonth: '*',
+          cronMonth: '*',
+          cronDayOfWeek: '*',
+          args: '{}',
+          lastSync: '',
+          lastRun: '',
+        },
+      ];
+
+      // モックの設定
+      const mockGetAllRows = jest.fn().mockReturnValue(mockRows);
+      const mockUpdateLastRun = jest.fn();
+      const mockExecuteWorkflowWithApiKey = jest.fn().mockRejectedValue(new Error('Test error'));
+
+      (SheetManager as jest.Mock).mockImplementation(() => ({
+        getAllRows: mockGetAllRows,
+        updateLastRun: mockUpdateLastRun,
+      }));
+
+      (DifyClient as jest.Mock).mockImplementation(() => ({
+        executeWorkflowWithApiKey: mockExecuteWorkflowWithApiKey,
       }));
 
       // テスト実行 - エラーがスローされずにキャッチされることを確認

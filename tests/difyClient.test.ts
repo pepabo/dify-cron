@@ -331,79 +331,12 @@ describe('DifyClient', () => {
     });
   });
 
-  describe('executeWorkflow', () => {
-    const mockAppId = 'test-app';
-    const mockArgs = { test: true };
-
-    it('should execute workflow successfully', async () => {
-      // カスタムモックを設定
-      mockFetch
-        .mockImplementationOnce((url) => {
-          if (url.includes('/login')) {
-            return createMockResponse(200, { token: 'test-token' });
-          }
-          return createMockResponse(404, 'Not Found');
-        })
-        .mockImplementationOnce((url) => {
-          if (url.includes('/workflow')) {
-            return createMockResponse(200, { success: true });
-          }
-          return createMockResponse(404, 'Not Found');
-        });
-
-      const result = await client.executeWorkflow(mockAppId, mockArgs);
-      expect(result).toEqual({ success: true });
-    });
-
-    it('should throw DifyAPIError when workflow execution fails', async () => {
-      // カスタムモックを設定
-      mockFetch
-        .mockImplementationOnce((url) => {
-          if (url.includes('/login')) {
-            return createMockResponse(200, { token: 'test-token' });
-          }
-          return createMockResponse(404, 'Not Found');
-        })
-        .mockImplementationOnce((url) => {
-          if (url.includes('/workflow')) {
-            return createMockResponse(500, 'Internal Server Error');
-          }
-          return createMockResponse(404, 'Not Found');
-        });
-
-      await expect(client.executeWorkflow(mockAppId, mockArgs)).rejects.toThrow(
-        'API request failed',
-      );
-    });
-
-    it('should not modify input args', async () => {
-      // カスタムモックを設定
-      mockFetch
-        .mockImplementationOnce((url) => {
-          if (url.includes('/login')) {
-            return createMockResponse(200, { token: 'test-token' });
-          }
-          return createMockResponse(404, 'Not Found');
-        })
-        .mockImplementationOnce((url) => {
-          if (url.includes('/workflow')) {
-            return createMockResponse(200, { success: true });
-          }
-          return createMockResponse(404, 'Not Found');
-        });
-
-      const originalArgs = { test: true };
-      await client.executeWorkflow(mockAppId, originalArgs);
-      expect(originalArgs).toEqual({ test: true });
-    });
-  });
-
   describe('executeWorkflowWithApiKey', () => {
     const mockAppId = 'test-app';
     const mockApiKey = 'test-api-key';
     const mockInputs = { query: 'test query' };
 
-    it('should execute workflow with API key using the first endpoint', async () => {
+    it('should execute workflow with API key correctly', async () => {
       // カスタムモックを設定
       mockFetch.mockImplementationOnce((url) => {
         if (url.includes('/v1/workflows/run')) {
@@ -427,29 +360,10 @@ describe('DifyClient', () => {
       );
     });
 
-    it('should try fallback endpoints when the first one fails', async () => {
-      // カスタムモックを設定
-      mockFetch
-        .mockImplementationOnce((url) => {
-          if (url.includes('/v1/workflows/run')) {
-            return createMockResponse(404, 'Not Found');
-          }
-          return createMockResponse(404, 'Not Found');
-        })
-        .mockImplementationOnce((url) => {
-          if (url.includes('/api/workflow-run')) {
-            return createMockResponse(200, { success: true });
-          }
-          return createMockResponse(404, 'Not Found');
-        });
-
-      const result = await client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs);
-      expect(result).toEqual({ success: true });
-
-      // 1番目と2番目のエンドポイントが正しく呼ばれたことを検証
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(mockFetch.mock.calls[0][0]).toBe('https://api.dify.test/v1/workflows/run');
-      expect(mockFetch.mock.calls[1][0]).toBe('https://api.dify.test/api/workflow-run');
+    it('should throw error when API key is not provided', async () => {
+      await expect(client.executeWorkflowWithApiKey(mockAppId, '', mockInputs)).rejects.toThrow(
+        'API key is required',
+      );
     });
 
     it('should handle custom response_mode and user identifier', async () => {
@@ -486,20 +400,10 @@ describe('DifyClient', () => {
     });
 
     it('should handle errors and wrap them in DifyAPIError', async () => {
-      // カスタムモックを設定（両方のエンドポイントで失敗）
-      mockFetch
-        .mockImplementationOnce((url) => {
-          if (url.includes('/v1/workflows/run')) {
-            return createMockResponse(404, 'Not Found');
-          }
-          return createMockResponse(404, 'Not Found');
-        })
-        .mockImplementationOnce((url) => {
-          if (url.includes('/api/workflow-run')) {
-            return createMockResponse(500, 'Internal Server Error');
-          }
-          return createMockResponse(404, 'Not Found');
-        });
+      // APIエラーをシミュレート
+      mockFetch.mockImplementationOnce((url) => {
+        throw new Error('Network error');
+      });
 
       await expect(
         client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs),

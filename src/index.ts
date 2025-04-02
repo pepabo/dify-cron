@@ -126,20 +126,20 @@ export async function checkAndRunCronJobs() {
           Logger.log(`Executing workflow for ${row.id}`);
           const args = row.args ? JSON.parse(row.args) : {};
 
-          // APIシークレットが設定されている場合はAPIキーを使用
-          if (row.apiSecret) {
-            Logger.log(`Using API key for app ${row.id}`);
-            await client.executeWorkflowWithApiKey(
-              row.id,
-              row.apiSecret,
-              args,
-              'blocking', // レスポンスモード（blocking/streaming）
-              `cron-job-${row.id}`, // ユーザー識別子としてアプリIDを使用
-            );
-          } else {
-            Logger.log(`No API key found, using admin credentials for app ${row.id}`);
-            await client.executeWorkflow(row.id, args);
+          // APIシークレットが必須
+          if (!row.apiSecret) {
+            Logger.log(`Skipping workflow for ${row.id}: No API key provided`);
+            continue;
           }
+
+          Logger.log(`Using API key for app ${row.id}`);
+          await client.executeWorkflowWithApiKey(
+            row.id,
+            row.apiSecret,
+            args,
+            'blocking', // レスポンスモード（blocking/streaming）
+            `cron-job-${row.id}`, // ユーザー識別子としてアプリIDを使用
+          );
 
           sheetManager.updateLastRun(row.id, runTime);
         } catch (error) {

@@ -166,24 +166,6 @@ export class DifyClient {
   }
 
   /**
-   * ワークフローを実行する
-   * @param {string} appId アプリケーションID
-   * @param {Record<string, unknown>} args 引数
-   * @returns {Promise<DifyResponse>} 実行結果
-   * @throws {DifyAPIError} APIエラー
-   */
-  async executeWorkflow(appId: string, args: Record<string, unknown>): Promise<DifyResponse> {
-    const token = await this.#getToken();
-    return this.#fetch(`/console/api/apps/${appId}/workflow`, {
-      method: 'post',
-      headers: { Authorization: `Bearer ${token}` },
-      contentType: 'application/json',
-      payload: JSON.stringify({ ...args }),
-      muteHttpExceptions: true,
-    });
-  }
-
-  /**
    * APIキーを使ってワークフローを実行する
    * @param {string} appId アプリケーションID
    * @param {string} apiKey アプリケーションAPIキー
@@ -201,66 +183,31 @@ export class DifyClient {
     userIdentifier = 'system-cron',
   ): Promise<DifyResponse> {
     try {
+      if (!apiKey) {
+        throw new DifyAPIError('API key is required', 400, 'No API key provided');
+      }
+
       Logger.log(`Executing workflow with API key for app ${appId}`);
 
-      // 正しいエンドポイントとリクエスト形式に修正
-      // ホストごとに異なる可能性があるため、複数のパスパターンを試す
-
-      // まずオリジナルのパスで試す
       const payload: Record<string, unknown> = {
         inputs: inputs,
         response_mode: responseMode,
-        // userパラメータは必須なので必ず含める
         user: userIdentifier,
       };
 
       Logger.log(`Payload: ${JSON.stringify(payload)}`);
 
-      try {
-        // 1. 最初にパターン1で試す: /v1/workflows/run
-        return this.#fetch('/v1/workflows/run', {
-          method: 'post',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          contentType: 'application/json',
-          payload: JSON.stringify(payload),
-          muteHttpExceptions: true,
-        });
-      } catch (error1) {
-        Logger.log(`First endpoint attempt failed: ${error1}`);
-
-        try {
-          // 2. パターン2で試す: /api/workflow-run
-          Logger.log('Trying alternative endpoint: /api/workflow-run');
-          return this.#fetch('/api/workflow-run', {
-            method: 'post',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            contentType: 'application/json',
-            payload: JSON.stringify(payload),
-            muteHttpExceptions: true,
-          });
-        } catch (error2) {
-          Logger.log(`Second endpoint attempt failed: ${error2}`);
-
-          // 3. パターン3で試す: /workflows/${appId}/run
-          Logger.log(`Trying third endpoint: /workflows/${appId}/run`);
-          return this.#fetch(`/workflows/${appId}/run`, {
-            method: 'post',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            contentType: 'application/json',
-            payload: JSON.stringify(payload),
-            muteHttpExceptions: true,
-          });
-        }
-      }
+      // 正しいエンドポイントのみを使用
+      return this.#fetch('/v1/workflows/run', {
+        method: 'post',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true,
+      });
     } catch (error) {
       Logger.log(`Error executing workflow with API key: ${error}`);
       if (error instanceof DifyAPIError) {
