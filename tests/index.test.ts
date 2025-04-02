@@ -333,7 +333,7 @@ describe('Main Application', () => {
       // モックの設定
       const mockGetAllRows = jest.fn().mockReturnValue(mockRows);
       const mockUpdateLastRun = jest.fn();
-      const mockExecuteWorkflowWithApiKey = jest.fn().mockResolvedValue({ success: true });
+      const mockExecuteWorkflow = jest.fn().mockResolvedValue({ success: true });
 
       (SheetManager as jest.Mock).mockImplementation(() => ({
         getAllRows: mockGetAllRows,
@@ -341,7 +341,7 @@ describe('Main Application', () => {
       }));
 
       (DifyClient as jest.Mock).mockImplementation(() => ({
-        executeWorkflowWithApiKey: mockExecuteWorkflowWithApiKey,
+        executeWorkflow: mockExecuteWorkflow,
       }));
 
       // テスト実行
@@ -349,28 +349,28 @@ describe('Main Application', () => {
 
       // 検証
       expect(mockGetAllRows).toHaveBeenCalled();
-      expect(mockExecuteWorkflowWithApiKey).toHaveBeenCalledWith(
+      expect(mockExecuteWorkflow).toHaveBeenCalledWith(
         'app1',
         'api-key-1',
         { param: 'value' },
         'blocking',
         'cron-job-app1',
       );
-      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalledWith(
+      expect(mockExecuteWorkflow).not.toHaveBeenCalledWith(
         'app2',
         expect.any(String),
         expect.any(Object),
         expect.any(String),
         expect.any(String),
       ); // app2はcron不一致なので実行されない
-      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalledWith(
+      expect(mockExecuteWorkflow).not.toHaveBeenCalledWith(
         'app3',
         expect.any(String),
         expect.any(Object),
         expect.any(String),
         expect.any(String),
       ); // app3は無効化されているので実行されない
-      expect(mockExecuteWorkflowWithApiKey).not.toHaveBeenCalledWith(
+      expect(mockExecuteWorkflow).not.toHaveBeenCalledWith(
         'app4',
         expect.any(String),
         expect.any(Object),
@@ -407,7 +407,7 @@ describe('Main Application', () => {
       // モックの設定
       const mockGetAllRows = jest.fn().mockReturnValue(mockRows);
       const mockUpdateLastRun = jest.fn();
-      const mockExecuteWorkflowWithApiKey = jest.fn().mockRejectedValue(new Error('Test error'));
+      const mockExecuteWorkflow = jest.fn().mockRejectedValue(new Error('Test error'));
 
       (SheetManager as jest.Mock).mockImplementation(() => ({
         getAllRows: mockGetAllRows,
@@ -415,7 +415,7 @@ describe('Main Application', () => {
       }));
 
       (DifyClient as jest.Mock).mockImplementation(() => ({
-        executeWorkflowWithApiKey: mockExecuteWorkflowWithApiKey,
+        executeWorkflow: mockExecuteWorkflow,
       }));
 
       // テスト実行 - エラーがスローされずにキャッチされることを確認

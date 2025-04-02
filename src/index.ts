@@ -133,7 +133,7 @@ export async function checkAndRunCronJobs() {
           }
 
           Logger.log(`Using API key for app ${row.id}`);
-          await client.executeWorkflowWithApiKey(
+          await client.executeWorkflow(
             row.id,
             row.apiSecret,
             args,

@@ -331,7 +331,7 @@ describe('DifyClient', () => {
     });
   });
 
-  describe('executeWorkflowWithApiKey', () => {
+  describe('executeWorkflow', () => {
     const mockAppId = 'test-app';
     const mockApiKey = 'test-api-key';
     const mockInputs = { query: 'test query' };
@@ -345,7 +345,7 @@ describe('DifyClient', () => {
         return createMockResponse(404, 'Not Found');
       });
 
-      const result = await client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs);
+      const result = await client.executeWorkflow(mockAppId, mockApiKey, mockInputs);
       expect(result).toEqual({ success: true, results: 'test result' });
 
       // 正しいエンドポイントが呼ばれたことを検証
@@ -361,7 +361,7 @@ describe('DifyClient', () => {
     });
 
     it('should throw error when API key is not provided', async () => {
-      await expect(client.executeWorkflowWithApiKey(mockAppId, '', mockInputs)).rejects.toThrow(
+      await expect(client.executeWorkflow(mockAppId, '', mockInputs)).rejects.toThrow(
         'API key is required',
       );
     });
@@ -375,13 +375,7 @@ describe('DifyClient', () => {
         return createMockResponse(404, 'Not Found');
       });
 
-      await client.executeWorkflowWithApiKey(
-        mockAppId,
-        mockApiKey,
-        mockInputs,
-        'streaming',
-        'custom-user',
-      );
+      await client.executeWorkflow(mockAppId, mockApiKey, mockInputs, 'streaming', 'custom-user');
 
       // カスタムパラメータが正しく渡されたか検証
       expect(mockFetch).toHaveBeenCalledWith(
@@ -405,9 +399,9 @@ describe('DifyClient', () => {
         throw new Error('Network error');
       });
 
-      await expect(
-        client.executeWorkflowWithApiKey(mockAppId, mockApiKey, mockInputs),
-      ).rejects.toThrow(DifyAPIError);
+      await expect(client.executeWorkflow(mockAppId, mockApiKey, mockInputs)).rejects.toThrow(
+        DifyAPIError,
+      );
     });
   });
 });

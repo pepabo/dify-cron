@@ -166,7 +166,7 @@ export class DifyClient {
   }
 
   /**
-   * APIキーを使ってワークフローを実行する
+   * ワークフローを実行する
    * @param {string} appId アプリケーションID
    * @param {string} apiKey アプリケーションAPIキー
    * @param {Record<string, unknown>} inputs 入力データ
@@ -175,7 +175,7 @@ export class DifyClient {
    * @returns {Promise<DifyResponse>} 実行結果
    * @throws {DifyAPIError} APIエラー
    */
-  async executeWorkflowWithApiKey(
+  async executeWorkflow(
     appId: string,
     apiKey: string,
     inputs: Record<string, unknown>,
